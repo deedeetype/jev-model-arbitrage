@@ -38,9 +38,15 @@ exports.handler = async function (event) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ error: "OPENROUTER_API_KEY is not configured on this Netlify site" }),
+      body: JSON.stringify({
+        model: "MAIN_AGENT", size: null, task_type: null,
+        size_confidence: 0, task_confidence: 0, cost: 0,
+        prompt, exec_cost: HARDEST_BASELINE, provider: "main-agent",
+        hardest_baseline: HARDEST_BASELINE,
+        error: "OPENROUTER_API_KEY is not configured on this Netlify site (Site configuration → Environment variables)",
+      }),
     };
   }
 

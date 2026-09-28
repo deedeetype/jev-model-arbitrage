@@ -142,7 +142,9 @@ function pickModel(sizeChoice, taskChoice) {
 
 const TOKENS_IN = 900;
 const TOKENS_OUT = 450;
-const HARDEST_MODEL = "anthropic/claude-opus-5";
+// Comparison baseline: Claude Opus 5.5 (David's requested comparison point),
+// the current top-of-line Anthropic model in this fleet (AA Intelligence Index 58).
+const HARDEST_MODEL = "anthropic/claude-opus-5-5";
 const _h = MODEL_BENCHMARKS[HARDEST_MODEL];
 const HARDEST_BASELINE = (TOKENS_IN / 1e6) * _h.input_per_M + (TOKENS_OUT / 1e6) * _h.output_per_M;
 
