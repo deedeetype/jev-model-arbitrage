@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jev Model Arbitrage — Live Test</title>
+<style>
+  :root{
+    --bg:#0a0a0a; --panel:#111111; --orange:#ff6a2b; --line:#3a3a3a;
+    --white:#f5f5f0; --muted:#8a8a85; --teal:#2bd6c8; --anthropic:#c96442; --ollama:#4a9eff; --red:#ff4d4d;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0;padding:0;width:100%;min-height:100%; background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
+  #stage{ position:relative; width:100%; min-height:920px; padding-bottom:40px;
+    background-image: radial-gradient(circle, #202020 1px, transparent 1px);
+    background-size: 22px 22px; background-color: var(--bg); }
+  #stage::after{ content:""; position:absolute; inset:0;
+    background: radial-gradient(ellipse at 25% 12%, rgba(255,106,43,0.06), transparent 55%); pointer-events:none; }
+
+  .hdr{ position:relative; padding:20px 36px 0; display:flex; align-items:baseline; justify-content:space-between; z-index:5; }
+  .hdr h1{ color:var(--white); font-size:19px; margin:0; letter-spacing:0.2px; }
+  .hdr h1 span{color:var(--orange);}
+  .hdr .sub{color:var(--muted); font-size:11px;}
+
+  #inputrow{ position:relative; margin:20px 36px 0; display:flex; gap:10px; z-index:5; }
+  #prompt-input{
+    flex:1; background:var(--panel); border:1.5px solid #333; border-radius:10px;
+    padding:14px 16px; color:var(--white); font-size:15px; font-family:inherit;
+    outline:none; transition:border-color 0.2s ease;
+  }
+  #prompt-input:focus{ border-color:var(--orange); }
+  #prompt-input::placeholder{ color:var(--muted); }
+  #route-btn{
+    background:var(--orange); color:#1a0d05; border:none; border-radius:10px;
+    padding:0 22px; font-weight:800; font-size:14px; cursor:pointer;
+    transition:opacity 0.2s ease, transform 0.1s ease;
+  }
+  #route-btn:hover{ opacity:0.9; }
+  #route-btn:active{ transform:scale(0.97); }
+  #route-btn:disabled{ opacity:0.5; cursor:default; }
+
+  #examples{ position:relative; margin:10px 36px 0; display:flex; gap:8px; flex-wrap:wrap; z-index:5; }
+  .example-chip{ font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:14px;
+    padding:5px 12px; cursor:pointer; transition:all 0.2s ease; background:transparent; }
+  .example-chip:hover{ border-color:var(--orange); color:var(--orange); }
+
+  #bubble{ position:relative; margin:20px 36px 0; width:380px; min-height:60px;
+    background:var(--panel); border:1.5px solid #2a2a2a; border-radius:12px;
+    padding:14px 18px; color:var(--white); font-size:14px; line-height:1.4; z-index:5;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4); display:none;}
+  #bubble.show{ display:block; }
+  #bubble .tag{ display:block; font-size:9px; color:var(--orange); font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+
+  #jev{ position:absolute; top:220px; left:160px; width:104px; height:88px;
+    background:var(--panel); border:2px solid var(--orange); border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 0 rgba(255,106,43,0); transition:box-shadow 0.3s ease, transform 0.3s ease; z-index:3;}
+  #jev.pulse{ box-shadow:0 0 36px rgba(255,106,43,0.55); transform:scale(1.05); }
+  #jev.thinking{ animation: think 0.9s ease-in-out infinite; }
+  @keyframes think{ 0%,100%{box-shadow:0 0 10px rgba(255,106,43,0.3);} 50%{box-shadow:0 0 34px rgba(255,106,43,0.7);} }
+  #jev svg{width:44px;height:44px;}
+  #jev .label{ position:absolute; bottom:-22px; left:0; right:0; text-align:center; color:var(--orange); font-size:10px; font-weight:700; letter-spacing:1px; }
+
+  #decision{ position:relative; margin:14px 36px 0; width:380px; font-size:12px; color:var(--muted); line-height:1.6; min-height:20px; z-index:5;}
+  #decision b{ color:var(--white); }
+  #decision .win{ color:var(--teal); font-weight:800; }
+  #decision .err{ color:var(--red); font-weight:700; }
+
+  #fleet{ position:relative; margin:64px 36px 0 auto; width:640px; float:right; z-index:5;}
+  .fleet-title{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:flex; justify-content:space-between; }
+  .fleet-grid{ display:grid; grid-template-columns:repeat(8, 1fr); gap:6px; }
+  .model-chip{ position:relative; border:1.5px solid var(--line); border-radius:6px; padding:6px 4px; text-align:center;
+    background:var(--panel); transition:all 0.35s ease; }
+  .model-chip .dot{ width:6px;height:6px;border-radius:50%; margin:0 auto 4px; }
+  .model-chip.ollama .dot{ background:var(--ollama); }
+  .model-chip.anthropic .dot{ background:var(--anthropic); }
+  .model-chip .mname{ font-size:8.5px; color:var(--muted); line-height:1.2; word-break:break-word; }
+  .model-chip .midx{ font-size:8px; color:#555; margin-top:2px; }
+  .model-chip.eliminated{ opacity:0.15; }
+  .model-chip.winner{ border-color:var(--teal); box-shadow:0 0 18px rgba(43,214,200,0.5); opacity:1; transform:scale(1.08); }
+  .model-chip.winner .mname{ color:var(--teal); font-weight:700; }
+
+  #clearfix{ clear:both; }
+
+  #costs{ position:relative; margin:40px 36px 0; display:flex; gap:50px; align-items:flex-end; z-index:5;}
+  .cost-col{display:flex; flex-direction:column; align-items:center;}
+  .cost-bar-wrap{ width:56px; height:110px; display:flex; align-items:flex-end; }
+  .cost-bar{ width:100%; background:var(--panel); border:2px solid var(--line); border-radius:4px 4px 0 0; transition:height 0.5s ease, border-color 0.4s ease; }
+  .cost-bar.jev{border-color:var(--orange);}
+  .cost-val{color:var(--white); font-size:17px; font-weight:800; margin-top:7px;}
+  .cost-label{color:var(--muted); font-size:9px; margin-top:2px; text-align:center; max-width:96px;}
+
+  #multiplier{ position:relative; margin:0 0 0 30px; background:var(--orange); color:#1a0d05; font-weight:800; font-size:13px;
+    padding:6px 12px; border-radius:7px; opacity:0; transform:translateY(8px); transition:opacity 0.4s ease, transform 0.4s ease;
+    display:inline-block; align-self:center; }
+  #multiplier.show{opacity:1; transform:translateY(0);}
+
+  #history{ position:relative; margin:24px 36px 0; z-index:5; }
+  .hist-title{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .hist-row{ display:flex; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid #1a1a1a; font-size:12px; }
+  .hist-row .hp{ flex:1; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hist-row .hm{ color:var(--teal); font-weight:700; width:160px; }
+  .hist-row .hc{ color:var(--white); width:70px; text-align:right; }
+
+  #status{ position:relative; margin:0 36px; font-size:11px; color:var(--muted); z-index:5;}
+  #status.err{ color:var(--red); }
+  #footer{ position:relative; margin:24px 36px 0; color:var(--muted); font-size:9.5px; text-align:center; line-height:1.5; z-index:5;}
+  #footer b{color:var(--white);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="hdr">
+    <h1><span>Jev</span> Model Arbitrage — Live Test (type a prompt, see the real routing)</h1>
+    <div class="sub" id="hdrsub">idle</div>
+  </div>
+
+  <div id="inputrow">
+    <input id="prompt-input" type="text" placeholder="Type any task, e.g. 'Write a poem about the sea' or 'Debug this Python function'..." />
+    <button id="route-btn">Route it</button>
+  </div>
+  <div id="examples">
+    <button class="example-chip" data-p="Rename this file to invoice_final.pdf">rename a file</button>
+    <button class="example-chip" data-p="Write a short poem about autumn rain">write a poem</button>
+    <button class="example-chip" data-p="Fix this Python function, it throws an IndexError on empty lists">fix code</button>
+    <button class="example-chip" data-p="Build a 3-year go-to-market strategy for a new SaaS product">business strategy</button>
+    <button class="example-chip" data-p="What's the boiling point of water at sea level?">factual question</button>
+  </div>
+  <div id="status"></div>
+
+  <div id="bubble"><div class="tag">Last routed prompt</div><div id="bubbletext"></div></div>
+
+  <div id="jev">
+    <svg viewBox="0 0 100 100" fill="none">
+      <rect x="10" y="10" width="80" height="80" rx="14" fill="#ff6a2b"/>
+      <rect x="28" y="38" width="12" height="14" rx="3" fill="#0a0a0a"/>
+      <rect x="60" y="38" width="12" height="14" rx="3" fill="#0a0a0a"/>
+      <rect x="30" y="62" width="40" height="8" rx="4" fill="#0a0a0a"/>
+    </svg>
+    <div class="label">JEV</div>
+  </div>
+
+  <div id="decision">Type a prompt above and click "Route it" to see Jev pick a real model from David's fleet.</div>
+
+  <div id="fleet">
+    <div class="fleet-title"><span>Full fleet (31 models)</span><span><span style="color:var(--ollama)">● Ollama-Cloud</span> &nbsp; <span style="color:var(--anthropic)">● Anthropic</span></span></div>
+    <div class="fleet-grid" id="fleet-grid"></div>
+  </div>
+  <div id="clearfix"></div>
+
+  <div id="costs">
+    <div class="cost-col">
+      <div class="cost-bar-wrap"><div class="cost-bar jev" id="bar-jev" style="height:0px;"></div></div>
+      <div class="cost-val" id="val-jev">$0.0000</div>
+      <div class="cost-label">this prompt, routed</div>
+    </div>
+    <div class="cost-col">
+      <div class="cost-bar-wrap"><div class="cost-bar" id="bar-base" style="height:0px;"></div></div>
+      <div class="cost-val" id="val-base">$0.0000</div>
+      <div class="cost-label">Claude Opus 5<br>every time</div>
+    </div>
+    <div id="multiplier">—x cheaper</div>
+  </div>
+
+  <div id="history">
+    <div class="hist-title">Session history</div>
+    <div id="hist-rows"></div>
+  </div>
+
+  <div id="footer">Intelligence Index: Artificial Analysis (artificialanalysis.ai), independent 3rd-party benchmark · Pricing: real $/M-token from Hermes' model cache<br>Live API: typesafe/jev-1.13 via Netlify Functions — every result on this page is a real API call, not a canned demo</div>
+</div>
+
+<script>
+const API_BASE = "/.netlify/functions";
+const jevEl = document.getElementById('jev');
+const hdrsub = document.getElementById('hdrsub');
+const input = document.getElementById('prompt-input');
+const btn = document.getElementById('route-btn');
+const statusEl = document.getElementById('status');
+const bubble = document.getElementById('bubble');
+const bubbletext = document.getElementById('bubbletext');
+const decisionEl = document.getElementById('decision');
+const fleetGrid = document.getElementById('fleet-grid');
+const histRows = document.getElementById('hist-rows');
+
+let FLEET = {};
+let HARDEST_BASELINE = 0.01575;
+let history = [];
+
+function shortName(m){ return (m.split('/')[1] || m); }
+
+async function loadFleet(){
+  try{
+    const res = await fetch(API_BASE + '/fleet');
+    const data = await res.json();
+    FLEET = data.fleet;
+    HARDEST_BASELINE = data.hardest_baseline;
+    Object.keys(FLEET).forEach(m=>{
+      const provider = m.startsWith('anthropic') ? 'anthropic' : 'ollama';
+      const div = document.createElement('div');
+      div.className = 'model-chip ' + provider;
+      div.id = 'chip-' + m.replace(/[^a-zA-Z0-9]/g,'_');
+      div.innerHTML = `<div class="dot"></div><div class="mname">${shortName(m)}</div><div class="midx">idx ${FLEET[m].intelligence_index}</div>`;
+      fleetGrid.appendChild(div);
+    });
+    statusEl.textContent = `Connected — ${Object.keys(FLEET).length} models loaded from live fleet.`;
+    hdrsub.textContent = 'ready';
+  }catch(e){
+    statusEl.textContent = 'Could not reach the routing functions. Check OPENROUTER_API_KEY is set in Netlify env vars.';
+    statusEl.classList.add('err');
+    hdrsub.textContent = 'server offline';
+  }
+}
+
+function resetFleetHighlight(){
+  Object.keys(FLEET).forEach(m=>{
+    const el = document.getElementById('chip-' + m.replace(/[^a-zA-Z0-9]/g,'_'));
+    el.classList.remove('winner','eliminated');
+  });
+}
+
+async function routePrompt(promptText){
+  if(!promptText || !promptText.trim()) return;
+  btn.disabled = true;
+  jevEl.classList.add('thinking');
+  hdrsub.textContent = 'routing...';
+  statusEl.textContent = '';
+  statusEl.classList.remove('err');
+
+  bubble.classList.add('show');
+  bubbletext.textContent = promptText;
+
+  try{
+    const res = await fetch(API_BASE + '/route', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: promptText})
+    });
+    const r = await res.json();
+    jevEl.classList.remove('thinking');
+    jevEl.classList.add('pulse');
+    setTimeout(()=> jevEl.classList.remove('pulse'), 500);
+
+    resetFleetHighlight();
+    const winnerModel = (r.model && r.model !== 'MAIN_AGENT') ? r.model : null;
+
+    Object.keys(FLEET).forEach(m=>{
+      const el = document.getElementById('chip-' + m.replace(/[^a-zA-Z0-9]/g,'_'));
+      if(winnerModel){
+        el.classList.add(m === winnerModel ? 'winner' : 'eliminated');
+      } else {
+        el.classList.add('eliminated');
+      }
+    });
+
+    if(winnerModel){
+      const bench = FLEET[winnerModel];
+      decisionEl.innerHTML = `Size: <b>${r.size}</b> (${(r.size_confidence*100).toFixed(0)}% conf) &nbsp;|&nbsp; Type: <b>${r.task_type}</b> (${(r.task_confidence*100).toFixed(0)}% conf)<br>
+        Chosen model: <span class="win">${shortName(winnerModel)}</span> — AA Intelligence Index ${bench.intelligence_index}, $${bench.input_per_M}/$${bench.output_per_M} per M tokens (${bench.index_source})<br>
+        Jev routing call cost: $${r.cost.toFixed(6)} &nbsp;|&nbsp; Estimated execution cost: $${r.exec_cost.toFixed(6)}`;
+    } else {
+      decisionEl.innerHTML = `<span class="err">Confidence too low (or short reply) — kept with Main Agent for safety.</span><br>
+        Size: ${r.size ?? '—'} &nbsp;|&nbsp; Type: ${r.task_type ?? '—'}`;
+    }
+
+    const scale = 100 / (HARDEST_BASELINE*10);
+    document.getElementById('bar-jev').style.height = Math.max(4, r.exec_cost*scale)+'px';
+    document.getElementById('bar-base').style.height = Math.max(4, HARDEST_BASELINE*scale)+'px';
+    document.getElementById('val-jev').textContent = '$'+r.exec_cost.toFixed(4);
+    document.getElementById('val-base').textContent = '$'+HARDEST_BASELINE.toFixed(4);
+    const mult = document.getElementById('multiplier');
+    if(r.exec_cost > 0){
+      mult.textContent = (HARDEST_BASELINE/r.exec_cost).toFixed(1)+'x cheaper';
+      mult.classList.add('show');
+    } else {
+      mult.classList.remove('show');
+    }
+
+    history.unshift(r);
+    if(history.length > 12) history.pop();
+    renderHistory();
+
+    hdrsub.textContent = 'ready';
+  }catch(e){
+    jevEl.classList.remove('thinking');
+    statusEl.textContent = 'Request failed: ' + e.message;
+    statusEl.classList.add('err');
+    hdrsub.textContent = 'error';
+  }
+  btn.disabled = false;
+}
+
+function renderHistory(){
+  histRows.innerHTML = history.map(r=>{
+    const label = (r.model && r.model !== 'MAIN_AGENT') ? shortName(r.model) : 'Main Agent';
+    return `<div class="hist-row"><div class="hp">${r.prompt}</div><div class="hm">${label}</div><div class="hc">$${r.exec_cost.toFixed(5)}</div></div>`;
+  }).join('');
+}
+
+btn.addEventListener('click', ()=> routePrompt(input.value));
+input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') routePrompt(input.value); });
+document.querySelectorAll('.example-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    input.value = chip.dataset.p;
+    routePrompt(chip.dataset.p);
+  });
+});
+
+loadFleet();
+</script>
+</body>
+</html>

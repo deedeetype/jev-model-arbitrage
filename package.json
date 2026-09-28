@@ -1,0 +1,9 @@
+{
+  "name": "jev-model-arbitrage",
+  "version": "1.0.0",
+  "description": "Live Jev model arbitrage tester — routes prompts across Anthropic + Ollama-Cloud fleet by size and task type, using real Artificial Analysis benchmarks and real per-token pricing.",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
